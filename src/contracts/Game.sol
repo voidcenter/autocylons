@@ -340,7 +340,7 @@ contract Game {
         return keccak256(abi.encodePacked(str1)) == keccak256(abi.encodePacked(str2));
     }
 
-    function randMod(uint _modulus) external returns(uint)
+    function randMod(uint _modulus) private returns(uint)
     {
         // increase nonce
         randNonce++;
