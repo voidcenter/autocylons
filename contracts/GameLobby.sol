@@ -12,6 +12,7 @@ contract GameLobby {
     }
 
     event GameStatusUpdated (uint gameId, GamePlayModel.GameStatus previousGameState, GamePlayModel.GameStatus currentGameStatus);
+    event Debug (uint gameId, string msg);
 
     function joinLobby(string memory _userName, uint256 _gameId) public {
         require(gamePlayHelper.isExistingGame(_gameId), "Invalid game Id");
@@ -26,7 +27,9 @@ contract GameLobby {
     }
 
     function createGame(string memory _userName) public returns (uint256) {
+        emit Debug(gamePlayModel.getGameNumber(), "Game id before increment");
         gamePlayModel.incrementGame();
+        emit Debug(gamePlayModel.getGameNumber(), "Game id was incremented");
         uint256 numberOfGames = gamePlayModel.getGameNumber();
         GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(numberOfGames);
         gamePlayModel.createPlayer(_userName, numberOfGames);
