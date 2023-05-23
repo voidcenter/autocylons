@@ -1,10 +1,9 @@
-pragma solidity ^0.5.0;
+pragma solidity 0.8.18;
 
 contract Game {
     enum GameStatus { PendingStart, MafiaTurn, CastingVotes, GameOver }
     enum PlayerRole { Villager, Mafia }
     enum PlayerState { Dead, Alive }
-
 
     mapping(address => uint256) userToAddressVoteMap;
     mapping(uint256 => GameState) public gameState;
@@ -14,7 +13,7 @@ contract Game {
 
     struct Player {
         string name;
-        address payable id;
+        address id;
         bool startGame;
         PlayerRole role;
         PlayerState state;
@@ -41,33 +40,21 @@ contract Game {
     }
 
     event GameStatusUpdated (uint gameId, GameStatus previousGameState, GameStatus currentGameStatus);
-    event VotingConversations(uint gameId, address sender, string msg);
-
-
-
-
-    constructor() public {
-    }
 
     function joinLobby(string memory _userName, uint256 _gameId) public {
         require(isExistingGame(_gameId), "Invalid game Id");
-        require(!isPlayerAlreadyInGame(_gameId, msg.sender), "Player already in game");
+        uint256 playerIdx = getPlayerIndexFromName(_userName, _gameId);
+        bool playerExist = true;
+        if (playerIdx >= gameState[_gameId].players.length) {
+            playerExist = false;
+        }
+        require(!playerExist, "Villager does not exist");
 
         Player memory player = Player(_userName, msg.sender, false, PlayerRole.Villager, PlayerState.Alive);
         gameState[_gameId].players.push(player);
     }
 
     function createGame(string memory _userName) public returns (uint256) {
-        // Init objects which need to go inside GameState
-//        Player[] initPlayers = new Player[](numberOfPlayers);
-//        Player memory player = Player(_userName, msg.sender, false, PlayerRole.Villager, PlayerState.Alive);
-//        initPlayers.push(player);
-//        Vote[] memory votes;
-//        MafiaKillings[] memory mafiaKillings;
-
-//        numberOfGames++;
-//        gameState[numberOfGames] = GameState(GameStatus.PendingStart, initPlayers, votes, mafiaKillings, 0);
-//        gameIdList.push(numberOfGames);
         numberOfGames++;
         Player memory player = Player(_userName, msg.sender, false, PlayerRole.Villager, PlayerState.Alive);
         gameState[numberOfGames].players.push(player);
@@ -79,7 +66,13 @@ contract Game {
     function startGame(uint256 _gameId) public {
         // Randomly assign a member as mafia just when the last player moves the state to start game.
         require(isExistingGame(_gameId), "Invalid game Id");
-        require(isPlayerAlreadyInGame(_gameId, msg.sender), "Player not in game");
+
+        uint256 playerIdx = getPlayerIndex(msg.sender, _gameId);
+        bool playerExist = true;
+        if (playerIdx >= gameState[_gameId].players.length) {
+            playerExist = false;
+        }
+        require(playerExist, "Player not in game");
 
         gameState[_gameId].players[getPlayerIndex(msg.sender, _gameId)].startGame = true;
         if (allPlayersStartedGame(_gameId)) {
@@ -121,6 +114,7 @@ contract Game {
         } else {
             gameState[_gameId].currentState = GameStatus.CastingVotes;
         }
+
         GameStatus status = gameState[_gameId].currentState;
         emit GameStatusUpdated(_gameId, previousStatus, status);
     }
@@ -167,24 +161,6 @@ contract Game {
         }
     }
 
-
-
-    function addVotingConversation(string memory _votingConversation, uint256 _gameId) public {
-        // Ensure game exits. Ensure that the player is part of the game.
-        // Add a comment and emit an event.
-        require(isExistingGame(_gameId), "Invalid game");
-        uint256 playerIdx = getPlayerIndex(msg.sender, _gameId);
-        bool playerExist = true;
-        if (playerIdx >= gameState[_gameId].players.length) {
-            playerExist = false;
-        }
-        require(playerExist, "Invalid player");
-        require(isPlayerAlive(playerIdx, _gameId), "Player is not alive");
-
-        emit VotingConversations(_gameId, msg.sender, _votingConversation);
-    }
-
-
     function isPlayerMafia(address playerId, uint256 _gameId) private returns (bool) {
         GameState memory gameStateInfo = gameState[_gameId];
         if (gameStateInfo.players[getPlayerIndex(playerId, _gameId)].role == PlayerRole.Mafia) {
@@ -205,17 +181,7 @@ contract Game {
         for (uint256 i = 0; i < gameIdList.length; i++) {
             if (gameIdList[i] == gameId) {
                 if (gameState[gameId].currentState != GameStatus.GameOver)
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function isPlayerAlreadyInGame(uint256 _gameId, address _id) private returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
-        for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
-            if (gameStateInfo.players[i].id == _id) {
-                return true;
+                    return true;
             }
         }
         return false;
@@ -336,7 +302,7 @@ contract Game {
         return 0;
     }
 
-    function compareString(string memory str1, string memory str2) public pure returns (bool) {
+    function compareString(string memory str1, string memory str2) private pure returns (bool) {
         return keccak256(abi.encodePacked(str1)) == keccak256(abi.encodePacked(str2));
     }
 
@@ -346,37 +312,4 @@ contract Game {
         randNonce++;
         return uint(keccak256(abi.encodePacked(block.timestamp,msg.sender,randNonce))) % _modulus;
     }
-
-//    function createProduct(string memory _name, uint _price) public {
-//        require(bytes(_name).length > 0);
-//        require(_price > 0);
-//        // Ensure parameters of product are correct
-//        // Create a product
-//        // Trigger an event
-//        // Increment productCount
-//        productCount++;
-//        products[productCount] = Product(productCount, _name, _price, msg.sender, false);
-//        emit ProductCreated(productCount, _name, _price, msg.sender, false);
-//    }
-//
-//    function purchaseProduct(uint _id) public payable {
-//        // Fetch the product
-//        // memory creates a deep copy (new copy) different instance from the blockchain
-//        Product memory _product = products[_id];
-//        // Fetch the owner
-//        address payable _seller = _product.owner;
-//        // Make sure the product is valid
-//        require(_product.id > 0 && _product.id <= productCount); // product has a valid id
-//        require(msg.value >= _product.price); // caller account has enough eth
-//        require(!_product.purchased); // product is not purchased
-//        require(_seller != msg.sender); // seller is not the buyer
-//        // Transfer ownership to the buyer
-//        _product.owner = msg.sender;
-//        _product.purchased = true;
-//        products[_id] = _product;
-//        // Transfer the ether value to the seller
-//        address(_seller).transfer(msg.value);
-//        // Emit an event
-//        emit ProductPurchased(_id, _product.name, _product.price, msg.sender, true);
-//    }
 }
