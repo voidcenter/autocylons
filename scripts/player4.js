@@ -2,6 +2,7 @@ const hre = require("hardhat");
 const {ethers} = require("hardhat");
 
 let accountId = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
+// let accountId = "47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a";
 let contractAdd = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
 async function joinLobby(gameId) {
     const contractAddress = contractAdd;
