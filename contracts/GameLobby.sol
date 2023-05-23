@@ -1,42 +1,45 @@
 pragma solidity 0.8.18;
 
+import "./GamePlayModel.sol";
 import "./GamePlayHelper.sol";
 
 contract GameLobby {
+    GamePlayModel gamePlayModel;
     GamePlayHelper gamePlayHelper;
-    GamePlayHelper.GameStatus public myEnumValue;
-    constructor(address counterAddress) {
-        gamePlayHelper = GamePlayHelper(counterAddress);
+    constructor(address gamePlayModelAddress, address gamePlayHelperAddress) {
+        gamePlayModel = GamePlayModel(gamePlayModelAddress);
+        gamePlayHelper = GamePlayHelper(gamePlayHelperAddress);
     }
 
-    event GameStatusUpdated (uint gameId, GamePlayHelper.GameStatus previousGameState, GamePlayHelper.GameStatus currentGameStatus);
+    event GameStatusUpdated (uint gameId, GamePlayModel.GameStatus previousGameState, GamePlayModel.GameStatus currentGameStatus);
 
     function joinLobby(string memory _userName, uint256 _gameId) public {
         require(gamePlayHelper.isExistingGame(_gameId), "Invalid game Id");
-        GamePlayHelper.GameState memory gameStateInfo = gamePlayHelper.getGameState(_gameId);
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         uint256 playerIdx = gamePlayHelper.getPlayerIndexFromName(_userName, _gameId);
         bool playerExist = true;
         if (playerIdx >= gameStateInfo.players.length) {
             playerExist = false;
         }
         require(!playerExist, "Villager does not exist");
-        gamePlayHelper.createPlayer(_userName, _gameId);
+        gamePlayModel.createPlayer(_userName, _gameId);
     }
 
     function createGame(string memory _userName) public returns (uint256) {
-        gamePlayHelper.incrementGame();
-        uint256 numberOfGames = gamePlayHelper.getGameNumber();
-        GamePlayHelper.GameState memory gameStateInfo = gamePlayHelper.getGameState(numberOfGames);
-        gamePlayHelper.createPlayer(_userName, numberOfGames);
+        gamePlayModel.incrementGame();
+        uint256 numberOfGames = gamePlayModel.getGameNumber();
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(numberOfGames);
+        gamePlayModel.createPlayer(_userName, numberOfGames);
         gameStateInfo.roundNumber = 0;
-        gameStateInfo.currentState = GamePlayHelper.GameStatus.PendingStart;
+        gameStateInfo.currentState = GamePlayModel.GameStatus.PendingStart;
+        gamePlayModel.addGameInGameList(numberOfGames);
         return numberOfGames;
     }
 
     function startGame(uint256 _gameId) public {
         // Randomly assign a member as mafia just when the last player moves the state to start game.
         require(gamePlayHelper.isExistingGame(_gameId), "Invalid game Id");
-        GamePlayHelper.GameState memory gameStateInfo = gamePlayHelper.getGameState(_gameId);
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
 
         uint256 playerIdx = gamePlayHelper.getPlayerIndex(msg.sender, _gameId);
         bool playerExist = true;
@@ -47,9 +50,9 @@ contract GameLobby {
 
         gameStateInfo.players[gamePlayHelper.getPlayerIndex(msg.sender, _gameId)].startGame = true;
         if (gamePlayHelper.allPlayersStartedGame(_gameId)) {
-            gameStateInfo.currentState = GamePlayHelper.GameStatus.MafiaTurn;
+            gameStateInfo.currentState = GamePlayModel.GameStatus.MafiaTurn;
             uint idx = gamePlayHelper.randMod(gameStateInfo.players.length);
-            gameStateInfo.players[idx].role = GamePlayHelper.PlayerRole.Mafia;
+            gameStateInfo.players[idx].role = GamePlayModel.PlayerRole.Mafia;
         }
     }
 
@@ -60,10 +63,10 @@ contract GameLobby {
         // Kill the player and alter the state of the game.
         require(gamePlayHelper.isExistingGame(_gameId), "Game id invalid.");
         require(gamePlayHelper.isPlayerMafia(msg.sender, _gameId), "Player is not a Mafia");
-        require(gamePlayHelper.isGameStateCorrect(_gameId, GamePlayHelper.GameStatus.MafiaTurn), "Invalid game state");
+        require(gamePlayHelper.isGameStateCorrect(_gameId, GamePlayModel.GameStatus.MafiaTurn), "Invalid game state");
         uint256 villagerIdx = gamePlayHelper.getPlayerIndexFromName(_killedVillagerName, _gameId);
         bool villagerExist = true;
-        GamePlayHelper.GameState memory gameStateInfo = gamePlayHelper.getGameState(_gameId);
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         if (villagerIdx >= gameStateInfo.players.length) {
             villagerExist = false;
         }
@@ -75,18 +78,18 @@ contract GameLobby {
         uint256 idx = gamePlayHelper.getPlayerIndexFromName(_killedVillagerName, _gameId);
         require(gamePlayHelper.isPlayerAlive(villagerIdx, _gameId), "Villager is already dead");
 
-        gameStateInfo.players[villagerIdx].state = GamePlayHelper.PlayerState.Dead;
+        gameStateInfo.players[villagerIdx].state = GamePlayModel.PlayerState.Dead;
         uint256 roundNumber = gameStateInfo.roundNumber;
-        gamePlayHelper.createMafiaKillings(roundNumber,
+        gamePlayModel.createMafiaKillings(roundNumber,
             gameStateInfo.players[mafiaIdx], gameStateInfo.players[villagerIdx], _gameId);
-        GamePlayHelper.GameStatus previousStatus = gameStateInfo.currentState;
+        GamePlayModel.GameStatus previousStatus = gameStateInfo.currentState;
         if (gamePlayHelper.checkWinningCondition(_gameId)) {
-            gameStateInfo.currentState = GamePlayHelper.GameStatus.GameOver;
+            gameStateInfo.currentState = GamePlayModel.GameStatus.GameOver;
         } else {
-            gameStateInfo.currentState = GamePlayHelper.GameStatus.CastingVotes;
+            gameStateInfo.currentState = GamePlayModel.GameStatus.CastingVotes;
         }
 
-        GamePlayHelper.GameStatus status = gameStateInfo.currentState;
+        GamePlayModel.GameStatus status = gameStateInfo.currentState;
         emit GameStatusUpdated(_gameId, previousStatus, status);
     }
 
@@ -96,10 +99,10 @@ contract GameLobby {
         // If all alive players have voted - make sure to move the state. If the game gets over emit apt event.
 
         require(gamePlayHelper.isExistingGame(_gameId), "Game id invalid.");
-        require(gamePlayHelper.isGameStateCorrect(_gameId, GamePlayHelper.GameStatus.CastingVotes), "Invalid game state");
+        require(gamePlayHelper.isGameStateCorrect(_gameId, GamePlayModel.GameStatus.CastingVotes), "Invalid game state");
         uint256 voterIdx = gamePlayHelper.getPlayerIndex(msg.sender, _gameId);
         bool voterExist = true;
-        GamePlayHelper.GameState memory gameStateInfo = gamePlayHelper.getGameState(_gameId);
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         if (voterIdx >= gameStateInfo.players.length) {
             voterExist = false;
         }
@@ -115,20 +118,20 @@ contract GameLobby {
         uint256 roundNumber = gameStateInfo.roundNumber;
         require(gamePlayHelper.checkPlayerAlreadyVoted(_gameId, roundNumber), "Voter has already voted");
 
-        gamePlayHelper.createVote(roundNumber, gameStateInfo.players[voterIdx],
+        gamePlayModel.createVote(roundNumber, gameStateInfo.players[voterIdx],
             gameStateInfo.players[votedAgainstIdx], _gameId);
         if (gamePlayHelper.checkAllAlivePlayersVoted(_gameId, roundNumber)) {
             uint256 killedPlayerIdx = gamePlayHelper.checkWhoWasVotedOut(_gameId, roundNumber);
-            gameStateInfo.players[killedPlayerIdx].state = GamePlayHelper.PlayerState.Dead;
+            gameStateInfo.players[killedPlayerIdx].state = GamePlayModel.PlayerState.Dead;
 
-            GamePlayHelper.GameStatus previousStatus = gameStateInfo.currentState;
+            GamePlayModel.GameStatus previousStatus = gameStateInfo.currentState;
             if (gamePlayHelper.checkWinningCondition(_gameId)) {
-                gameStateInfo.currentState = GamePlayHelper.GameStatus.GameOver;
+                gameStateInfo.currentState = GamePlayModel.GameStatus.GameOver;
             } else {
-                gameStateInfo.currentState = GamePlayHelper.GameStatus.MafiaTurn;
+                gameStateInfo.currentState = GamePlayModel.GameStatus.MafiaTurn;
                 gameStateInfo.roundNumber++;
             }
-            GamePlayHelper.GameStatus status = gameStateInfo.currentState;
+            GamePlayModel.GameStatus status = gameStateInfo.currentState;
             emit GameStatusUpdated(_gameId, previousStatus, status);
         }
     }

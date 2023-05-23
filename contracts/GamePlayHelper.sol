@@ -1,65 +1,35 @@
 pragma solidity 0.8.18;
-
-
+import "./GamePlayModel.sol";
 contract GamePlayHelper {
-    enum GameStatus { PendingStart, MafiaTurn, CastingVotes, GameOver }
-    enum PlayerRole { Villager, Mafia }
-    enum PlayerState { Dead, Alive }
 
-    mapping(address => uint256) userToAddressVoteMap;
-    mapping(uint256 => GameState) public gameState;
-    uint256 numberOfGames = 0;
-    uint256[] gameIdList;
+    GamePlayModel gamePlayModel;
     uint randNonce = 0;
-
-    struct Player {
-        string name;
-        address id;
-        bool startGame;
-        PlayerRole role;
-        PlayerState state;
-    }
-
-    struct Vote {
-        uint256 roundNumber;
-        Player voter;
-        Player votedAgainst;
-    }
-
-    struct MafiaKillings {
-        uint256 roundNumber;
-        Player mafia;
-        Player killedPlayer;
-    }
-
-    struct GameState {
-        GameStatus currentState;
-        Player[] players;
-        Vote[] votes;
-        MafiaKillings[] mafiaKillings;
-        uint256 roundNumber;
+    constructor(address counterAddress) {
+        gamePlayModel = GamePlayModel(counterAddress);
     }
 
     function isPlayerMafia(address playerId, uint256 _gameId) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
-        if (gameStateInfo.players[getPlayerIndex(playerId, _gameId)].role == PlayerRole.Mafia) {
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
+        if (gameStateInfo.players[getPlayerIndex(playerId, _gameId)].role == GamePlayModel.PlayerRole.Mafia) {
             return true;
         }
         return false;
     }
 
-    function isGameStateCorrect(uint256 gameId, GameStatus gameStatus) public returns (bool) {
-        GameState memory gameStateInfo = gameState[gameId];
+    function isGameStateCorrect(uint256 _gameId, GamePlayModel.GameStatus gameStatus) public returns (bool) {
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         if (gameStateInfo.currentState == gameStatus) {
             return true;
         }
         return false;
     }
 
-    function isExistingGame(uint256 gameId) public returns (bool) {
-        for (uint256 i = 0; i < gameIdList.length; i++) {
-            if (gameIdList[i] == gameId) {
-                if (gameState[gameId].currentState != GameStatus.GameOver)
+    function isExistingGame(uint256 _gameId) public returns (bool) {
+        uint256[] memory _gameIdList = gamePlayModel.getGameIdList();
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
+        for (uint256 i = 0; i < _gameIdList.length; i++) {
+            if (_gameIdList[i] == _gameId) {
+                if (gameStateInfo.currentState != GamePlayModel.GameStatus.GameOver)
                     return true;
             }
         }
@@ -68,7 +38,7 @@ contract GamePlayHelper {
 
 
     function allPlayersStartedGame(uint256 _gameId) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
             if (!gameStateInfo.players[i].startGame) {
                 return false;
@@ -78,7 +48,7 @@ contract GamePlayHelper {
     }
 
     function getPlayerIndex(address _playerId, uint256 _gameId) public returns (uint256) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
             if (gameStateInfo.players[i].id == _playerId) {
                 return i;
@@ -88,7 +58,7 @@ contract GamePlayHelper {
     }
 
     function getPlayerIndexFromName(string memory _playerName, uint256 _gameId) public returns (uint256) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
             if (compareString(gameStateInfo.players[i].name, _playerName)) {
                 return i;
@@ -98,8 +68,8 @@ contract GamePlayHelper {
     }
 
     function isPlayerAlive(uint256 index, uint256 _gameId) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
-        if (gameStateInfo.players[index].state == PlayerState.Alive) {
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
+        if (gameStateInfo.players[index].state == GamePlayModel.PlayerState.Alive) {
             return true;
         }
         return false;
@@ -107,16 +77,18 @@ contract GamePlayHelper {
 
 
     function checkWinningCondition(uint256 _gameId) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         uint256 aliveVillagersCount = 0;
         uint256 aliveMafiaCount = 0;
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
-            if (gameStateInfo.players[i].state == PlayerState.Alive && gameStateInfo.players[i].role == PlayerRole.Villager) {
+            if (gameStateInfo.players[i].state == GamePlayModel.PlayerState.Alive &&
+                gameStateInfo.players[i].role == GamePlayModel.PlayerRole.Villager) {
                 aliveVillagersCount++;
             }
         }
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
-            if (gameStateInfo.players[i].state == PlayerState.Alive && gameStateInfo.players[i].role == PlayerRole.Mafia) {
+            if (gameStateInfo.players[i].state == GamePlayModel.PlayerState.Alive &&
+                gameStateInfo.players[i].role == GamePlayModel.PlayerRole.Mafia) {
                 aliveMafiaCount++;
             }
         }
@@ -127,11 +99,11 @@ contract GamePlayHelper {
     }
 
     function checkAllAlivePlayersVoted(uint256 _gameId, uint256 roundNumber) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         uint256 aliveCount = 0;
         uint256 votesCount = 0;
         for (uint256 i = 0; i < gameStateInfo.players.length; i++) {
-            if (gameStateInfo.players[i].state == PlayerState.Alive) {
+            if (gameStateInfo.players[i].state == GamePlayModel.PlayerState.Alive) {
                 aliveCount++;
             }
         }
@@ -147,7 +119,7 @@ contract GamePlayHelper {
     }
 
     function checkPlayerAlreadyVoted(uint256 _gameId, uint256 roundNumber) public returns (bool) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         for (uint256 i = 0; i < gameStateInfo.votes.length; i++) {
             if (gameStateInfo.votes[i].roundNumber == roundNumber) {
                 if (gameStateInfo.votes[i].voter.id == msg.sender) {
@@ -159,16 +131,24 @@ contract GamePlayHelper {
     }
 
     function checkWhoWasVotedOut(uint256 _gameId, uint256 roundNumber) public returns (uint256) {
-        GameState memory gameStateInfo = gameState[_gameId];
+        GamePlayModel.GameState memory gameStateInfo = gamePlayModel.getGameState(_gameId);
         uint256 maxVote = 0;
         address votedPlayer;
         for (uint256 i = 0; i < gameStateInfo.votes.length; i++) {
+            uint256 count = 0;
             if (gameStateInfo.votes[i].roundNumber == roundNumber) {
-                Player memory votedAgainst = gameStateInfo.votes[i].votedAgainst;
-                userToAddressVoteMap[votedAgainst.id]++;
-                if (maxVote < userToAddressVoteMap[votedAgainst.id]) {
-                    maxVote = userToAddressVoteMap[votedAgainst.id];
-                    votedPlayer = votedAgainst.id;
+                GamePlayModel.Player memory votedAgainstI = gameStateInfo.votes[i].votedAgainst;
+                for (uint256 j = 0; j < gameStateInfo.votes.length; j++) {
+                    if (gameStateInfo.votes[j].roundNumber == roundNumber) {
+                        GamePlayModel.Player memory votedAgainstJ = gameStateInfo.votes[j].votedAgainst;
+                        if (votedAgainstI.id == votedAgainstJ.id) {
+                            count++;
+                        }
+                    }
+                }
+                if (count >= maxVote) {
+                    maxVote = count;
+                    votedPlayer = votedAgainstI.id;
                 }
             }
         }
@@ -185,35 +165,8 @@ contract GamePlayHelper {
         return keccak256(abi.encodePacked(str1)) == keccak256(abi.encodePacked(str2));
     }
 
-    function randMod(uint _modulus) public returns(uint)
-    {
-        // increase nonce
+    function randMod(uint _modulus) public returns(uint){
         randNonce++;
         return uint(keccak256(abi.encodePacked(block.timestamp,msg.sender,randNonce))) % _modulus;
-    }
-
-    function createPlayer(string memory _userName, uint256 _gameId) public {
-        Player memory player = Player(_userName, msg.sender, false, PlayerRole.Villager, PlayerState.Alive);
-        gameState[_gameId].players.push(player);
-    }
-
-    function getGameState(uint256 _gameId) public returns (GameState memory) {
-        return gameState[_gameId];
-    }
-
-    function incrementGame() public {
-        numberOfGames++;
-    }
-
-    function getGameNumber() public returns (uint256) {
-        return numberOfGames;
-    }
-
-    function createMafiaKillings(uint256 roundNumber, Player memory mafia, Player memory killedPlayer, uint256 _gameId) public {
-        gameState[_gameId].mafiaKillings.push(MafiaKillings(roundNumber, mafia, killedPlayer));
-    }
-
-    function createVote(uint256 roundNumber, Player memory voter, Player memory votedAgainst, uint256 _gameId) public {
-        gameState[_gameId].votes.push(Vote(roundNumber, voter, votedAgainst));
     }
 }
