@@ -5,6 +5,7 @@ contract GamePlayModel {
     enum GameStatus { PendingStart, MafiaTurn, CastingVotes, GameOver }
     enum PlayerRole { Villager, Mafia }
     enum PlayerState { Dead, Alive }
+    enum Winner {Villager, Mafia}
 
     mapping(uint256 => GameState) public gameState;
     uint256 numberOfGames = 0;

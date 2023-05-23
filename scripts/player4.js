@@ -1,18 +1,18 @@
 const hre = require("hardhat");
 const {ethers} = require("hardhat");
 
-let accountId = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+let accountId = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
 let contractAdd = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
-async function createGame() {
+async function joinLobby(gameId) {
     const contractAddress = contractAdd;
     const GameLobby = await hre.ethers.getContractFactory("GameLobby");
     const gameLobby = await GameLobby.attach(contractAddress);
 
     // Interact with the contract
-    const result = await gameLobby.createGame("player1", { from: accountId });
+    const result = await gameLobby.joinLobby("player4", gameId, { from: accountId });
     // console.log("Result:", result.value.toNumber());
-    let gameId = result.value.toNumber();
-    console.log("gameID : ", gameId);
+    // gameId = result.value.toNumber();
+    // console.log("gameID : ", gameId);
     // console.log("Logs:" , await result.wait())
 }
 
@@ -28,7 +28,6 @@ async function startGame(gameId) {
     // console.log("gameID : ", gameId);
     // console.log("Logs:" , await result.wait())
 }
-
 
 async function mafiaKills(gameId) {
     const contractAddress = contractAdd;
@@ -56,11 +55,12 @@ async function castVotes(gameId) {
     console.log("Logs:" , await result.wait())
 }
 
-
 module.exports = {
-    createGame,
+    joinLobby,
     startGame,
     mafiaKills,
     castVotes
 };
 
+
+// // node -e "require('./scripts/player1').createGame('player1')"

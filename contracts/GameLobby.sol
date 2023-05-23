@@ -11,8 +11,9 @@ contract GameLobby {
         gamePlayHelper = GamePlayHelper(gamePlayHelperAddress);
     }
 
-    event GameStatusUpdated (uint gameId, GamePlayModel.GameStatus previousGameState, GamePlayModel.GameStatus currentGameStatus);
-    event Debug (uint gameId, string msg);
+    event GameStatusUpdated (uint256 gameId, GamePlayModel.GameStatus previousGameState, GamePlayModel.GameStatus currentGameStatus);
+    event Debug (uint256 gameId, string msg);
+    event GameOverEvent(uint256 gameId, GamePlayModel.Winner winner);
 
     function joinLobby(string memory _userName, uint256 _gameId) public {
         require(gamePlayHelper.isExistingGame(_gameId), "Invalid game Id");
@@ -88,6 +89,7 @@ contract GameLobby {
         GamePlayModel.GameStatus previousStatus = gameStateInfo.currentState;
         if (gamePlayHelper.checkWinningCondition(_gameId)) {
             gameStateInfo.currentState = GamePlayModel.GameStatus.GameOver;
+            emit GameOverEvent(_gameId, GamePlayModel.Winner.Mafia);
         } else {
             gameStateInfo.currentState = GamePlayModel.GameStatus.CastingVotes;
         }
@@ -130,6 +132,10 @@ contract GameLobby {
             GamePlayModel.GameStatus previousStatus = gameStateInfo.currentState;
             if (gamePlayHelper.checkWinningCondition(_gameId)) {
                 gameStateInfo.currentState = GamePlayModel.GameStatus.GameOver;
+                emit GameOverEvent(_gameId, GamePlayModel.Winner.Mafia);
+            } else if (gameStateInfo.players[killedPlayerIdx].role == GamePlayModel.PlayerRole.Mafia) {
+                gameStateInfo.currentState = GamePlayModel.GameStatus.GameOver;
+                emit GameOverEvent(_gameId, GamePlayModel.Winner.Villager);
             } else {
                 gameStateInfo.currentState = GamePlayModel.GameStatus.MafiaTurn;
                 gameStateInfo.roundNumber++;
